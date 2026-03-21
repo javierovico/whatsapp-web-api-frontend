@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import Joi from "joi";
@@ -24,6 +24,8 @@ import {
   FormHelperText,
   Grid,
   IconButton,
+  Menu,
+  MenuItem,
   Snackbar,
   Stack,
   Switch,
@@ -40,6 +42,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useTheme } from "@mui/material/styles";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -235,6 +238,8 @@ export default function Home() {
   const [qrAutoRefreshState, setQrAutoRefreshState] = useState<"idle" | "running" | "time_limit" | "expired">("idle");
   const [qrRefreshSession, setQrRefreshSession] = useState(0);
   const [eventsClientKey, setEventsClientKey] = useState<string | null>(null);
+  const [actionsMenuAnchorEl, setActionsMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const [actionsMenuClient, setActionsMenuClient] = useState<WaClientListItemResponseHttpDto | null>(null);
 
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
@@ -400,6 +405,16 @@ export default function Home() {
 
   const restartQrAutoRefresh = useCallback(() => {
     setQrRefreshSession((current) => current + 1);
+  }, []);
+
+  const openActionsMenu = useCallback((event: MouseEvent<HTMLElement>, client: WaClientListItemResponseHttpDto) => {
+    setActionsMenuAnchorEl(event.currentTarget);
+    setActionsMenuClient(client);
+  }, []);
+
+  const closeActionsMenu = useCallback(() => {
+    setActionsMenuAnchorEl(null);
+    setActionsMenuClient(null);
   }, []);
 
   const runRotateIntegrationToken = useCallback(async () => {
@@ -588,67 +603,10 @@ export default function Home() {
                             </Typography>
                           </Stack>
                         </CardContent>
-                        <CardActions sx={{ flexWrap: "wrap", gap: 1, px: 2, pb: 2 }}>
-                          <Button size="small" onClick={() => setEditingClient(client)}>
-                            Editar
-                          </Button>
-                          <Button
-                            size="small"
-                            disabled={isActionLoading("toggle", client.clientKey)}
-                            onClick={() =>
-                              void runAction(
-                                "toggle",
-                                client.clientKey,
-                                () =>
-                                  client.isActive
-                                    ? deactivateWaClient(client.clientKey)
-                                    : activateWaClient(client.clientKey),
-                                client.isActive ? "Cliente desactivado." : "Cliente activado.",
-                              )
-                            }
-                          >
-                            {client.isActive ? "Desactivar" : "Activar"}
-                          </Button>
-                          <Button
-                            size="small"
-                            disabled={isActionLoading("reconnect", client.clientKey)}
-                            onClick={() =>
-                              void runAction(
-                                "reconnect",
-                                client.clientKey,
-                                () => reconnectWaClient(client.clientKey),
-                                "Cliente reconectado.",
-                              )
-                            }
-                          >
-                            Reconnect
-                          </Button>
-                          <Button size="small" onClick={() => setStatusClientKey(client.clientKey)}>
-                            Estado
-                          </Button>
-                          <Button size="small" onClick={() => setQrClientKey(client.clientKey)}>
-                            QR
-                          </Button>
-                          <Button size="small" onClick={() => setMessageClient(client)}>
-                            Enviar prueba
-                          </Button>
-                          <Button
-                            size="small"
-                            disabled={!client.hasIntegrationToken || isActionLoading("get-token", client.clientKey)}
-                            onClick={() => void runGetIntegrationToken(client.clientKey)}
-                          >
-                            Ver token
-                          </Button>
-                          <Button
-                            size="small"
-                            disabled={isActionLoading("rotate-token", client.clientKey)}
-                            onClick={() => setIntegrationTokenClient(client)}
-                          >
-                            Rotar token
-                          </Button>
-                          <Button size="small" onClick={() => setEventsClientKey(client.clientKey)}>
-                            Eventos
-                          </Button>
+                        <CardActions sx={{ justifyContent: "flex-end", px: 2, pb: 2 }}>
+                          <IconButton aria-label={`Acciones ${client.clientKey}`} onClick={(event) => openActionsMenu(event, client)}>
+                            <MoreVertIcon />
+                          </IconButton>
                         </CardActions>
                       </Card>
                     ))}
@@ -679,68 +637,9 @@ export default function Home() {
                             <TableCell>{client.hasIntegrationToken ? "Sí" : "No"}</TableCell>
                             <TableCell>{formatDate(client.updatedAt)}</TableCell>
                             <TableCell align="right">
-                              <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                                <Button size="small" onClick={() => setEditingClient(client)}>
-                                  Editar
-                                </Button>
-                                <Button
-                                  size="small"
-                                  disabled={isActionLoading("toggle", client.clientKey)}
-                                  onClick={() =>
-                                    void runAction(
-                                      "toggle",
-                                      client.clientKey,
-                                      () =>
-                                        client.isActive
-                                          ? deactivateWaClient(client.clientKey)
-                                          : activateWaClient(client.clientKey),
-                                      client.isActive ? "Cliente desactivado." : "Cliente activado.",
-                                    )
-                                  }
-                                >
-                                  {client.isActive ? "Desactivar" : "Activar"}
-                                </Button>
-                                <Button
-                                  size="small"
-                                  disabled={isActionLoading("reconnect", client.clientKey)}
-                                  onClick={() =>
-                                    void runAction(
-                                      "reconnect",
-                                      client.clientKey,
-                                      () => reconnectWaClient(client.clientKey),
-                                      "Cliente reconectado.",
-                                    )
-                                  }
-                                >
-                                  Reconnect
-                                </Button>
-                                <Button size="small" onClick={() => setStatusClientKey(client.clientKey)}>
-                                  Estado
-                                </Button>
-                                <Button size="small" onClick={() => setQrClientKey(client.clientKey)}>
-                                  QR
-                                </Button>
-                                <Button size="small" onClick={() => setMessageClient(client)}>
-                                  Enviar prueba
-                                </Button>
-                                <Button
-                                  size="small"
-                                  disabled={!client.hasIntegrationToken || isActionLoading("get-token", client.clientKey)}
-                                  onClick={() => void runGetIntegrationToken(client.clientKey)}
-                                >
-                                  Ver token
-                                </Button>
-                                <Button
-                                  size="small"
-                                  disabled={isActionLoading("rotate-token", client.clientKey)}
-                                  onClick={() => setIntegrationTokenClient(client)}
-                                >
-                                  Rotar token
-                                </Button>
-                                <Button size="small" onClick={() => setEventsClientKey(client.clientKey)}>
-                                  Eventos
-                                </Button>
-                              </Stack>
+                              <IconButton aria-label={`Acciones ${client.clientKey}`} onClick={(event) => openActionsMenu(event, client)}>
+                                <MoreVertIcon />
+                              </IconButton>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -767,6 +666,131 @@ export default function Home() {
           </Card>
         </Stack>
       </Container>
+
+      <Menu
+        anchorEl={actionsMenuAnchorEl}
+        open={Boolean(actionsMenuAnchorEl && actionsMenuClient)}
+        onClose={closeActionsMenu}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setEditingClient(actionsMenuClient);
+            closeActionsMenu();
+          }}
+        >
+          Editar
+        </MenuItem>
+        <MenuItem
+          disabled={!actionsMenuClient || isActionLoading("toggle", actionsMenuClient.clientKey)}
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            void runAction(
+              "toggle",
+              actionsMenuClient.clientKey,
+              () =>
+                actionsMenuClient.isActive
+                  ? deactivateWaClient(actionsMenuClient.clientKey)
+                  : activateWaClient(actionsMenuClient.clientKey),
+              actionsMenuClient.isActive ? "Cliente desactivado." : "Cliente activado.",
+            );
+            closeActionsMenu();
+          }}
+        >
+          {actionsMenuClient?.isActive ? "Desactivar" : "Activar"}
+        </MenuItem>
+        <MenuItem
+          disabled={!actionsMenuClient || isActionLoading("reconnect", actionsMenuClient.clientKey)}
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            void runAction(
+              "reconnect",
+              actionsMenuClient.clientKey,
+              () => reconnectWaClient(actionsMenuClient.clientKey),
+              "Cliente reconectado.",
+            );
+            closeActionsMenu();
+          }}
+        >
+          Reconnect
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setStatusClientKey(actionsMenuClient.clientKey);
+            closeActionsMenu();
+          }}
+        >
+          Estado
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setQrClientKey(actionsMenuClient.clientKey);
+            closeActionsMenu();
+          }}
+        >
+          QR
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setMessageClient(actionsMenuClient);
+            closeActionsMenu();
+          }}
+        >
+          Enviar prueba
+        </MenuItem>
+        <MenuItem
+          disabled={!actionsMenuClient || !actionsMenuClient.hasIntegrationToken || isActionLoading("get-token", actionsMenuClient.clientKey)}
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            void runGetIntegrationToken(actionsMenuClient.clientKey);
+            closeActionsMenu();
+          }}
+        >
+          Ver token
+        </MenuItem>
+        <MenuItem
+          disabled={!actionsMenuClient || isActionLoading("rotate-token", actionsMenuClient.clientKey)}
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setIntegrationTokenClient(actionsMenuClient);
+            closeActionsMenu();
+          }}
+        >
+          Rotar token
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setEventsClientKey(actionsMenuClient.clientKey);
+            closeActionsMenu();
+          }}
+        >
+          Eventos
+        </MenuItem>
+      </Menu>
 
       <WaClientCreateDialog
         open={createOpen}
