@@ -1,6 +1,8 @@
 import apiFront from "@/api-backend/api-backend-front";
 import { ClientKeyResponseHttpDto } from "@/api-backend/wa-clients/dto/client-key-response-http.dto";
 import { CreateWaClientHttpDto } from "@/api-backend/wa-clients/dto/create-wa-client-http.dto";
+import { GetIntegrationTokenResponseHttpDto } from "@/api-backend/wa-clients/dto/get-integration-token-response-http.dto";
+import { IssueIntegrationTokenResponseHttpDto } from "@/api-backend/wa-clients/dto/issue-integration-token-response-http.dto";
 import { PaginatedWaClientListResponseHttpDto } from "@/api-backend/wa-clients/dto/paginated-wa-client-list-response-http.dto";
 import { SendMessageAcceptedResponseHttpDto } from "@/api-backend/wa-clients/dto/send-message-accepted-response-http.dto";
 import { SendMessageHttpDto } from "@/api-backend/wa-clients/dto/send-message-http.dto";
@@ -60,5 +62,17 @@ export function getWaClientQr(clientKey: string) {
 export function sendWaClientMessage(clientKey: string, dto: SendMessageHttpDto) {
   return apiFront
     .post<SendMessageAcceptedResponseHttpDto>(`/api/wa-clients/${clientKey}/messages`, dto)
+    .then((response) => response.data);
+}
+
+export function rotateWaClientIntegrationToken(clientKey: string) {
+  return apiFront
+    .post<IssueIntegrationTokenResponseHttpDto>(`/api/wa-clients/${clientKey}/integration-token`)
+    .then((response) => response.data);
+}
+
+export function getWaClientIntegrationToken(clientKey: string) {
+  return apiFront
+    .get<GetIntegrationTokenResponseHttpDto>(`/api/wa-clients/${clientKey}/integration-token`)
     .then((response) => response.data);
 }

@@ -39,16 +39,19 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { useTheme } from "@mui/material/styles";
 import { QRCodeSVG } from "qrcode.react";
 import {
   activateWaClient,
   createWaClient,
   deactivateWaClient,
+  getWaClientIntegrationToken,
   getWaClientQr,
   getWaClientStatus,
   listWaClients,
   reconnectWaClient,
+  rotateWaClientIntegrationToken,
   sendWaClientMessage,
   updateWaClient,
 } from "@/api-backend/wa-clients/wa-clients.service";
@@ -221,6 +224,8 @@ export default function Home() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<WaClientListItemResponseHttpDto | null>(null);
   const [messageClient, setMessageClient] = useState<WaClientListItemResponseHttpDto | null>(null);
+  const [integrationTokenClient, setIntegrationTokenClient] = useState<WaClientListItemResponseHttpDto | null>(null);
+  const [rotatedIntegrationToken, setRotatedIntegrationToken] = useState<string | null>(null);
   const [statusClientKey, setStatusClientKey] = useState<string | null>(null);
   const [statusData, setStatusData] = useState<WaClientStatusResponseHttpDto | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -397,6 +402,62 @@ export default function Home() {
     setQrRefreshSession((current) => current + 1);
   }, []);
 
+  const runRotateIntegrationToken = useCallback(async () => {
+    if (!integrationTokenClient) {
+      return;
+    }
+
+    const clientKey = integrationTokenClient.clientKey;
+    setActionLoadingKey(`rotate-token:${clientKey}`);
+
+    try {
+      const data = await rotateWaClientIntegrationToken(clientKey);
+      setIntegrationTokenClient(null);
+      setRotatedIntegrationToken(data.token);
+      await fetchClients();
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo rotar el token de integración."));
+    } finally {
+      setActionLoadingKey(null);
+    }
+  }, [fetchClients, integrationTokenClient, showError]);
+
+  const runGetIntegrationToken = useCallback(
+    async (clientKey: string) => {
+      setActionLoadingKey(`get-token:${clientKey}`);
+
+      try {
+        const data = await getWaClientIntegrationToken(clientKey);
+        if (!data.exists || !data.token) {
+          showError("El cliente no tiene token de integración generado.");
+          return;
+        }
+        setRotatedIntegrationToken(data.token);
+      } catch (error) {
+        showError(getErrorMessage(error, "No se pudo obtener el token de integración."));
+      } finally {
+        setActionLoadingKey(null);
+      }
+    },
+    [showError],
+  );
+
+  const copyRotatedIntegrationToken = useCallback(async () => {
+    if (!rotatedIntegrationToken) {
+      return;
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard API no disponible.");
+      }
+      await navigator.clipboard.writeText(rotatedIntegrationToken);
+      showSuccess("Token copiado al portapapeles.");
+    } catch (error) {
+      showError(getErrorMessage(error, "No se pudo copiar el token."));
+    }
+  }, [rotatedIntegrationToken, showError, showSuccess]);
+
   const isActionLoading = useCallback(
     (action: string, clientKey: string) => actionLoadingKey === `${action}:${clientKey}`,
     [actionLoadingKey],
@@ -517,6 +578,7 @@ export default function Home() {
                             <Stack direction="row" spacing={1} flexWrap="wrap">
                               <Chip label={client.isActive ? "Activo" : "Inactivo"} color={client.isActive ? "success" : "default"} size="small" />
                               <Chip label={client.syncStatus} color={getStatusColor(client.syncStatus)} size="small" />
+                              <Chip label={client.hasIntegrationToken ? "Token: Sí" : "Token: No"} color={client.hasIntegrationToken ? "success" : "default"} size="small" />
                             </Stack>
                             <Typography variant="body2" color="text.secondary">
                               Nombre: {client.name || "-"}
@@ -570,6 +632,20 @@ export default function Home() {
                           <Button size="small" onClick={() => setMessageClient(client)}>
                             Enviar prueba
                           </Button>
+                          <Button
+                            size="small"
+                            disabled={!client.hasIntegrationToken || isActionLoading("get-token", client.clientKey)}
+                            onClick={() => void runGetIntegrationToken(client.clientKey)}
+                          >
+                            Ver token
+                          </Button>
+                          <Button
+                            size="small"
+                            disabled={isActionLoading("rotate-token", client.clientKey)}
+                            onClick={() => setIntegrationTokenClient(client)}
+                          >
+                            Rotar token
+                          </Button>
                           <Button size="small" onClick={() => setEventsClientKey(client.clientKey)}>
                             Eventos
                           </Button>
@@ -586,6 +662,7 @@ export default function Home() {
                           <TableCell>Nombre</TableCell>
                           <TableCell>Activo</TableCell>
                           <TableCell>Sync status</TableCell>
+                          <TableCell>Token</TableCell>
                           <TableCell>Actualizado</TableCell>
                           <TableCell align="right">Acciones</TableCell>
                         </TableRow>
@@ -599,6 +676,7 @@ export default function Home() {
                             <TableCell>
                               <Chip label={client.syncStatus} color={getStatusColor(client.syncStatus)} size="small" />
                             </TableCell>
+                            <TableCell>{client.hasIntegrationToken ? "Sí" : "No"}</TableCell>
                             <TableCell>{formatDate(client.updatedAt)}</TableCell>
                             <TableCell align="right">
                               <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
@@ -644,6 +722,20 @@ export default function Home() {
                                 </Button>
                                 <Button size="small" onClick={() => setMessageClient(client)}>
                                   Enviar prueba
+                                </Button>
+                                <Button
+                                  size="small"
+                                  disabled={!client.hasIntegrationToken || isActionLoading("get-token", client.clientKey)}
+                                  onClick={() => void runGetIntegrationToken(client.clientKey)}
+                                >
+                                  Ver token
+                                </Button>
+                                <Button
+                                  size="small"
+                                  disabled={isActionLoading("rotate-token", client.clientKey)}
+                                  onClick={() => setIntegrationTokenClient(client)}
+                                >
+                                  Rotar token
                                 </Button>
                                 <Button size="small" onClick={() => setEventsClientKey(client.clientKey)}>
                                   Eventos
@@ -821,6 +913,76 @@ export default function Home() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setQrClientKey(null)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(integrationTokenClient)}
+        onClose={() => {
+          if (actionLoadingKey?.startsWith("rotate-token:")) {
+            return;
+          }
+          setIntegrationTokenClient(null);
+        }}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Rotar token de integración</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5}>
+            <Alert severity="warning">
+              Esto va a reemplazar cualquier token anterior generado para este cliente.
+            </Alert>
+            <Typography>
+              <strong>Client key:</strong> {integrationTokenClient?.clientKey}
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setIntegrationTokenClient(null)}
+            disabled={Boolean(actionLoadingKey?.startsWith("rotate-token:"))}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void runRotateIntegrationToken()}
+            disabled={Boolean(actionLoadingKey?.startsWith("rotate-token:"))}
+          >
+            {actionLoadingKey?.startsWith("rotate-token:") ? "Rotando..." : "Rotar token"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(rotatedIntegrationToken)}
+        onClose={() => setRotatedIntegrationToken(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Token de integración</DialogTitle>
+        <DialogContent dividers>
+          <Stack direction="row" spacing={1} alignItems="flex-start">
+            <TextField
+              value={rotatedIntegrationToken ?? ""}
+              label="Token"
+              fullWidth
+              multiline
+              minRows={3}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                },
+              }}
+            />
+            <IconButton aria-label="Copiar token" onClick={() => void copyRotatedIntegrationToken()} sx={{ mt: 0.5 }}>
+              <ContentCopyIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRotatedIntegrationToken(null)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
 
