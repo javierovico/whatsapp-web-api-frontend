@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import "./globals.css";
 import AppProviders from "@/app/AppProviders";
 
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body>
+        <InitColorSchemeScript attribute="class" />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

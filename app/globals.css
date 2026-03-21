@@ -4,3 +4,7 @@ html,
 body {
   min-height: 100%;
 }
+
+body {
+  background-color: var(--mui-palette-background-default);
+}

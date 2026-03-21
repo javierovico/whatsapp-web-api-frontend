@@ -4,7 +4,7 @@ import { getToken } from "next-auth/jwt";
 export async function proxy(req: NextRequest) {
   const token = await getToken({ req });
 
-  if (!token) {
+  if (!token || token.authError === "AUTH_INVALID") {
     const loginUrl = new URL("/login", req.url);
     const callbackUrl = `${req.nextUrl.pathname}${req.nextUrl.search}`;
     loginUrl.searchParams.set("callbackUrl", callbackUrl);
@@ -19,4 +19,3 @@ export const config = {
     "/((?!api/auth|api/backend|_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|login).*)",
   ],
 };
-

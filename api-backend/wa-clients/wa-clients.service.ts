@@ -1,0 +1,64 @@
+import apiFront from "@/api-backend/api-backend-front";
+import { ClientKeyResponseHttpDto } from "@/api-backend/wa-clients/dto/client-key-response-http.dto";
+import { CreateWaClientHttpDto } from "@/api-backend/wa-clients/dto/create-wa-client-http.dto";
+import { PaginatedWaClientListResponseHttpDto } from "@/api-backend/wa-clients/dto/paginated-wa-client-list-response-http.dto";
+import { SendMessageAcceptedResponseHttpDto } from "@/api-backend/wa-clients/dto/send-message-accepted-response-http.dto";
+import { SendMessageHttpDto } from "@/api-backend/wa-clients/dto/send-message-http.dto";
+import { StatusOkResponseHttpDto } from "@/api-backend/wa-clients/dto/status-ok-response-http.dto";
+import { UpdateWaClientHttpDto } from "@/api-backend/wa-clients/dto/update-wa-client-http.dto";
+import { WaClientQrResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-qr-response-http.dto";
+import { WaClientStatusResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-status-response-http.dto";
+
+export function listWaClients(page = 1, perPage = 10) {
+  return apiFront
+    .get<PaginatedWaClientListResponseHttpDto>("/api/wa-clients", {
+      params: { page, perPage },
+    })
+    .then((response) => response.data);
+}
+
+export function createWaClient(dto: CreateWaClientHttpDto) {
+  return apiFront.post<ClientKeyResponseHttpDto>("/api/wa-clients", dto).then((response) => response.data);
+}
+
+export function updateWaClient(clientKey: string, dto: UpdateWaClientHttpDto) {
+  return apiFront
+    .patch<ClientKeyResponseHttpDto>(`/api/wa-clients/${clientKey}`, dto)
+    .then((response) => response.data);
+}
+
+export function activateWaClient(clientKey: string) {
+  return apiFront
+    .post<StatusOkResponseHttpDto>(`/api/wa-clients/${clientKey}/activate`)
+    .then((response) => response.data);
+}
+
+export function deactivateWaClient(clientKey: string) {
+  return apiFront
+    .post<StatusOkResponseHttpDto>(`/api/wa-clients/${clientKey}/deactivate`)
+    .then((response) => response.data);
+}
+
+export function reconnectWaClient(clientKey: string) {
+  return apiFront
+    .post<StatusOkResponseHttpDto>(`/api/wa-clients/${clientKey}/reconnect`)
+    .then((response) => response.data);
+}
+
+export function getWaClientStatus(clientKey: string) {
+  return apiFront
+    .get<WaClientStatusResponseHttpDto>(`/api/wa-clients/${clientKey}/status`)
+    .then((response) => response.data);
+}
+
+export function getWaClientQr(clientKey: string) {
+  return apiFront
+    .get<WaClientQrResponseHttpDto>(`/api/wa-clients/${clientKey}/qr`)
+    .then((response) => response.data);
+}
+
+export function sendWaClientMessage(clientKey: string, dto: SendMessageHttpDto) {
+  return apiFront
+    .post<SendMessageAcceptedResponseHttpDto>(`/api/wa-clients/${clientKey}/messages`, dto)
+    .then((response) => response.data);
+}

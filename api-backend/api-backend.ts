@@ -9,7 +9,7 @@ export async function getApiConAutenticacion(req: NextRequest) {
     baseURL: API_URL_PRIVADA,
     headers: {
       ...(token?.backendToken && {
-        Authorization: `Bearer ${token.backendToken}`,
+        Authorization: `${token.tokenType || "Bearer"} ${token.backendToken}`,
       }),
     },
   });
@@ -39,4 +39,3 @@ export const handleApiResponse = async <T>(promise: Promise<AxiosResponse<T>>) =
 };
 
 export default apiSinAutenticacion;
-
