@@ -82,6 +82,7 @@ interface WaClientCreateFormValues {
   webhookUrl: string;
   webhookSecret: string;
   isActive: boolean;
+  isIntegrationTestOnly: boolean;
   metadataText: string;
 }
 
@@ -128,6 +129,7 @@ const createWaClientSchema = Joi.object<WaClientCreateFormValues>({
   }),
   webhookSecret: joiStringRequired("Webhook secret"),
   isActive: Joi.boolean().required(),
+  isIntegrationTestOnly: Joi.boolean().required(),
   metadataText: metadataSchema,
 });
 
@@ -1204,6 +1206,7 @@ function WaClientCreateDialog({
       webhookUrl: "",
       webhookSecret: "",
       isActive: true,
+      isIntegrationTestOnly: true,
       metadataText: "",
     },
     enableReinitialize: true,
@@ -1215,6 +1218,7 @@ function WaClientCreateDialog({
           webhookUrl: values.webhookUrl.trim(),
           webhookSecret: values.webhookSecret.trim(),
           isActive: values.isActive,
+          isIntegrationTestOnly: values.isIntegrationTestOnly,
           ...(values.name.trim() && { name: values.name.trim() }),
           ...(values.metadataText.trim() && { metadata: parseMetadata(values.metadataText) }),
         };
@@ -1291,6 +1295,16 @@ function WaClientCreateDialog({
           <FormControlLabel
             control={<Switch name="isActive" checked={formik.values.isActive} onChange={formik.handleChange} />}
             label="Crear como activo"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                name="isIntegrationTestOnly"
+                checked={formik.values.isIntegrationTestOnly}
+                onChange={formik.handleChange}
+              />
+            }
+            label="Modo prueba de integración"
           />
         </Stack>
       </DialogContent>
