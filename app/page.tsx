@@ -42,20 +42,25 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useTheme } from "@mui/material/styles";
 import { QRCodeSVG } from "qrcode.react";
 import {
   activateWaClient,
+  addWaClientWhitelistNumber,
   createWaClient,
   deactivateWaClient,
   getWaClientIntegrationToken,
   getWaClientQr,
   getWaClientStatus,
   listWaClients,
+  listWaClientWhitelistNumbers,
   reconnectWaClient,
+  removeWaClientWhitelistNumber,
   rotateWaClientIntegrationToken,
   sendWaClientMessage,
+  setWaClientIntegrationMode,
   updateWaClient,
 } from "@/api-backend/wa-clients/wa-clients.service";
 import { CreateWaClientHttpDto } from "@/api-backend/wa-clients/dto/create-wa-client-http.dto";
@@ -64,6 +69,7 @@ import { UpdateWaClientHttpDto } from "@/api-backend/wa-clients/dto/update-wa-cl
 import { WaClientListItemResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-list-item-response-http.dto";
 import { WaClientQrResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-qr-response-http.dto";
 import { WaClientStatusResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-status-response-http.dto";
+import { WaClientWhitelistResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-whitelist-response-http.dto";
 import ModeSwitch from "@/app/components/ModeSwitch";
 import WaEventsDialog from "@/app/components/WaEventsDialog";
 import { NEXT_PUBLIC_WS_BASE_URL } from "@/config/environments";
@@ -90,6 +96,10 @@ interface WaClientUpdateFormValues {
 interface SendMessageFormValues {
   to: string;
   body: string;
+}
+
+interface WhitelistNumberFormValues {
+  waChatId: string;
 }
 
 const metadataSchema = Joi.string()
@@ -136,6 +146,12 @@ const sendMessageSchema = Joi.object<SendMessageFormValues>({
     "string.base": "Destino debe ser texto.",
   }),
   body: joiStringRequired("Mensaje"),
+});
+
+const whitelistNumberSchema = Joi.object<WhitelistNumberFormValues>({
+  waChatId: joiStringRequired("Número de prueba")
+    .pattern(/^\d{8,15}@c\.us$/)
+    .messages({ "string.pattern.base": "Debe tener formato 595981000000@c.us" }),
 });
 
 function parseMetadata(metadataText: string) {
@@ -240,6 +256,10 @@ export default function Home() {
   const [eventsClientKey, setEventsClientKey] = useState<string | null>(null);
   const [actionsMenuAnchorEl, setActionsMenuAnchorEl] = useState<HTMLElement | null>(null);
   const [actionsMenuClient, setActionsMenuClient] = useState<WaClientListItemResponseHttpDto | null>(null);
+  const [whitelistClient, setWhitelistClient] = useState<WaClientListItemResponseHttpDto | null>(null);
+  const [whitelistData, setWhitelistData] = useState<WaClientWhitelistResponseHttpDto | null>(null);
+  const [whitelistLoading, setWhitelistLoading] = useState(false);
+  const [whitelistActionLoading, setWhitelistActionLoading] = useState(false);
 
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
@@ -407,6 +427,31 @@ export default function Home() {
     setQrRefreshSession((current) => current + 1);
   }, []);
 
+  const loadWhitelistNumbers = useCallback(
+    async (clientKey: string) => {
+      setWhitelistLoading(true);
+      try {
+        const data = await listWaClientWhitelistNumbers(clientKey);
+        setWhitelistData(data);
+      } catch (error) {
+        showError(getErrorMessage(error, "No se pudieron cargar los números de prueba."));
+      } finally {
+        setWhitelistLoading(false);
+      }
+    },
+    [showError],
+  );
+
+  useEffect(() => {
+    if (!whitelistClient) {
+      setWhitelistData(null);
+      setWhitelistLoading(false);
+      return;
+    }
+
+    void loadWhitelistNumbers(whitelistClient.clientKey);
+  }, [loadWhitelistNumbers, whitelistClient]);
+
   const openActionsMenu = useCallback((event: MouseEvent<HTMLElement>, client: WaClientListItemResponseHttpDto) => {
     setActionsMenuAnchorEl(event.currentTarget);
     setActionsMenuClient(client);
@@ -492,6 +537,61 @@ export default function Home() {
       }
     },
     [fetchClients, showError, showSuccess],
+  );
+
+  const runSetIntegrationMode = useCallback(
+    async (client: WaClientListItemResponseHttpDto) => {
+      void runAction(
+        "integration-mode",
+        client.clientKey,
+        () =>
+          setWaClientIntegrationMode(client.clientKey, {
+            isIntegrationTestOnly: !client.isIntegrationTestOnly,
+          }),
+        !client.isIntegrationTestOnly ? "Modo prueba activado." : "Modo prueba desactivado.",
+      );
+    },
+    [runAction],
+  );
+
+  const runAddWhitelistNumber = useCallback(
+    async (waChatId: string) => {
+      if (!whitelistClient) {
+        return;
+      }
+      setWhitelistActionLoading(true);
+      try {
+        await addWaClientWhitelistNumber(whitelistClient.clientKey, { waChatId });
+        showSuccess("Número agregado a la whitelist.");
+        await loadWhitelistNumbers(whitelistClient.clientKey);
+        await fetchClients();
+      } catch (error) {
+        showError(getErrorMessage(error, "No se pudo agregar el número."));
+      } finally {
+        setWhitelistActionLoading(false);
+      }
+    },
+    [fetchClients, loadWhitelistNumbers, showError, showSuccess, whitelistClient],
+  );
+
+  const runRemoveWhitelistNumber = useCallback(
+    async (waChatId: string) => {
+      if (!whitelistClient) {
+        return;
+      }
+      setWhitelistActionLoading(true);
+      try {
+        await removeWaClientWhitelistNumber(whitelistClient.clientKey, waChatId);
+        showSuccess("Número eliminado de la whitelist.");
+        await loadWhitelistNumbers(whitelistClient.clientKey);
+        await fetchClients();
+      } catch (error) {
+        showError(getErrorMessage(error, "No se pudo eliminar el número."));
+      } finally {
+        setWhitelistActionLoading(false);
+      }
+    },
+    [fetchClients, loadWhitelistNumbers, showError, showSuccess, whitelistClient],
   );
 
   const activeClients = useMemo(() => clients.filter((client) => client.isActive).length, [clients]);
@@ -594,6 +694,16 @@ export default function Home() {
                               <Chip label={client.isActive ? "Activo" : "Inactivo"} color={client.isActive ? "success" : "default"} size="small" />
                               <Chip label={client.syncStatus} color={getStatusColor(client.syncStatus)} size="small" />
                               <Chip label={client.hasIntegrationToken ? "Token: Sí" : "Token: No"} color={client.hasIntegrationToken ? "success" : "default"} size="small" />
+                              <Chip
+                                label={`Modo prueba: ${client.isIntegrationTestOnly ? "Sí" : "No"}`}
+                                color={client.isIntegrationTestOnly ? "warning" : "default"}
+                                size="small"
+                              />
+                              <Chip
+                                label={`Whitelist: ${client.isIntegrationTestOnly ? client.whitelistCount : "-"}`}
+                                color={client.isIntegrationTestOnly ? "warning" : "default"}
+                                size="small"
+                              />
                             </Stack>
                             <Typography variant="body2" color="text.secondary">
                               Nombre: {client.name || "-"}
@@ -621,6 +731,8 @@ export default function Home() {
                           <TableCell>Activo</TableCell>
                           <TableCell>Sync status</TableCell>
                           <TableCell>Token</TableCell>
+                          <TableCell>Modo prueba</TableCell>
+                          <TableCell>Nros. prueba</TableCell>
                           <TableCell>Actualizado</TableCell>
                           <TableCell align="right">Acciones</TableCell>
                         </TableRow>
@@ -635,6 +747,8 @@ export default function Home() {
                               <Chip label={client.syncStatus} color={getStatusColor(client.syncStatus)} size="small" />
                             </TableCell>
                             <TableCell>{client.hasIntegrationToken ? "Sí" : "No"}</TableCell>
+                            <TableCell>{client.isIntegrationTestOnly ? "Sí" : "No"}</TableCell>
+                            <TableCell>{client.isIntegrationTestOnly ? client.whitelistCount : "-"}</TableCell>
                             <TableCell>{formatDate(client.updatedAt)}</TableCell>
                             <TableCell align="right">
                               <IconButton aria-label={`Acciones ${client.clientKey}`} onClick={(event) => openActionsMenu(event, client)}>
@@ -721,6 +835,29 @@ export default function Home() {
           }}
         >
           Reconnect
+        </MenuItem>
+        <MenuItem
+          disabled={!actionsMenuClient || isActionLoading("integration-mode", actionsMenuClient.clientKey)}
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            void runSetIntegrationMode(actionsMenuClient);
+            closeActionsMenu();
+          }}
+        >
+          {actionsMenuClient?.isIntegrationTestOnly ? "Desactivar modo prueba" : "Activar modo prueba"}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (!actionsMenuClient) {
+              return;
+            }
+            setWhitelistClient(actionsMenuClient);
+            closeActionsMenu();
+          }}
+        >
+          Números de prueba
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -831,6 +968,22 @@ export default function Home() {
           setMessageClient(null);
         }}
         onError={showError}
+      />
+
+      <WhitelistNumbersDialog
+        client={whitelistClient}
+        data={whitelistData}
+        loading={whitelistLoading}
+        actionLoading={whitelistActionLoading}
+        onClose={() => setWhitelistClient(null)}
+        onRefresh={() => {
+          if (!whitelistClient) {
+            return Promise.resolve();
+          }
+          return loadWhitelistNumbers(whitelistClient.clientKey);
+        }}
+        onAdd={runAddWhitelistNumber}
+        onRemove={runRemoveWhitelistNumber}
       />
 
       <WaEventsDialog
@@ -1327,6 +1480,127 @@ function SendMessageDialog({
         <Button onClick={() => void formik.submitForm()} variant="contained" disabled={formik.isSubmitting}>
           {formik.isSubmitting ? "Enviando..." : "Enviar"}
         </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function WhitelistNumbersDialog({
+  client,
+  data,
+  loading,
+  actionLoading,
+  onClose,
+  onRefresh,
+  onAdd,
+  onRemove,
+}: {
+  client: WaClientListItemResponseHttpDto | null;
+  data: WaClientWhitelistResponseHttpDto | null;
+  loading: boolean;
+  actionLoading: boolean;
+  onClose: () => void;
+  onRefresh: () => Promise<void>;
+  onAdd: (waChatId: string) => Promise<void>;
+  onRemove: (waChatId: string) => Promise<void>;
+}) {
+  const formik = useFormik<WhitelistNumberFormValues>({
+    initialValues: {
+      waChatId: "",
+    },
+    enableReinitialize: true,
+    validate: (values) => validateWithJoi(whitelistNumberSchema, values),
+    onSubmit: async (values, { setSubmitting, resetForm }) => {
+      try {
+        await onAdd(values.waChatId.trim());
+        resetForm();
+      } finally {
+        setSubmitting(false);
+      }
+    },
+  });
+
+  return (
+    <Dialog open={Boolean(client)} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Números de prueba</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2} sx={{ mt: 0.5 }}>
+          <Typography>
+            <strong>Client key:</strong> {client?.clientKey}
+          </Typography>
+          <Typography>
+            <strong>Modo prueba:</strong> {client?.isIntegrationTestOnly ? "Sí" : "No"}
+          </Typography>
+          {!client?.isIntegrationTestOnly ? (
+            <Alert severity="warning">
+              El cliente no está en modo prueba. Puedes gestionar la whitelist igual, pero no se aplicará hasta
+              activar modo prueba.
+            </Alert>
+          ) : null}
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ xs: "stretch", sm: "flex-start" }}>
+            <TextField
+              fullWidth
+              label="Número (waChatId)"
+              name="waChatId"
+              value={formik.values.waChatId}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              placeholder="595981000000@c.us"
+              error={formik.touched.waChatId && Boolean(formik.errors.waChatId)}
+              helperText={formik.touched.waChatId ? formik.errors.waChatId : "Formato requerido: 595981000000@c.us"}
+            />
+            <Button
+              variant="contained"
+              onClick={() => void formik.submitForm()}
+              disabled={loading || actionLoading || formik.isSubmitting}
+            >
+              Agregar
+            </Button>
+          </Stack>
+
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="subtitle2">Números habilitados</Typography>
+            <Button
+              variant="text"
+              onClick={() => void onRefresh()}
+              disabled={loading || actionLoading || formik.isSubmitting}
+            >
+              Recargar
+            </Button>
+          </Stack>
+
+          {loading ? (
+            <Box sx={{ py: 4, display: "grid", placeItems: "center" }}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : !data || data.data.length === 0 ? (
+            <Alert severity="info">No hay números de prueba para este cliente.</Alert>
+          ) : (
+            <Stack spacing={1}>
+              {data.data.map((item) => (
+                <Card key={item.waChatId} variant="outlined">
+                  <CardContent sx={{ py: 1.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                      <Typography sx={{ wordBreak: "break-all" }}>{item.waChatId}</Typography>
+                      <IconButton
+                        aria-label={`Eliminar ${item.waChatId}`}
+                        onClick={() => void onRemove(item.waChatId)}
+                        disabled={actionLoading || formik.isSubmitting}
+                        color="error"
+                      >
+                        <DeleteOutlineIcon />
+                      </IconButton>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cerrar</Button>
       </DialogActions>
     </Dialog>
   );

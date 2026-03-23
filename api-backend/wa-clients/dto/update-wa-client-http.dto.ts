@@ -3,5 +3,6 @@ export interface UpdateWaClientHttpDto {
   webhookSecret?: string;
   name?: string;
   isActive?: boolean;
+  isIntegrationTestOnly?: boolean;
   metadata?: Record<string, unknown>;
 }

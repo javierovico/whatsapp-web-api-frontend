@@ -1,4 +1,5 @@
 import apiFront from "@/api-backend/api-backend-front";
+import { AddWaClientWhitelistNumberHttpDto } from "@/api-backend/wa-clients/dto/add-wa-client-whitelist-number-http.dto";
 import { ClientKeyResponseHttpDto } from "@/api-backend/wa-clients/dto/client-key-response-http.dto";
 import { CreateWaClientHttpDto } from "@/api-backend/wa-clients/dto/create-wa-client-http.dto";
 import { GetIntegrationTokenResponseHttpDto } from "@/api-backend/wa-clients/dto/get-integration-token-response-http.dto";
@@ -6,10 +7,12 @@ import { IssueIntegrationTokenResponseHttpDto } from "@/api-backend/wa-clients/d
 import { PaginatedWaClientListResponseHttpDto } from "@/api-backend/wa-clients/dto/paginated-wa-client-list-response-http.dto";
 import { SendMessageAcceptedResponseHttpDto } from "@/api-backend/wa-clients/dto/send-message-accepted-response-http.dto";
 import { SendMessageHttpDto } from "@/api-backend/wa-clients/dto/send-message-http.dto";
+import { SetWaClientIntegrationModeHttpDto } from "@/api-backend/wa-clients/dto/set-wa-client-integration-mode-http.dto";
 import { StatusOkResponseHttpDto } from "@/api-backend/wa-clients/dto/status-ok-response-http.dto";
 import { UpdateWaClientHttpDto } from "@/api-backend/wa-clients/dto/update-wa-client-http.dto";
 import { WaClientQrResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-qr-response-http.dto";
 import { WaClientStatusResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-status-response-http.dto";
+import { WaClientWhitelistResponseHttpDto } from "@/api-backend/wa-clients/dto/wa-client-whitelist-response-http.dto";
 
 export function listWaClients(page = 1, perPage = 10) {
   return apiFront
@@ -74,5 +77,29 @@ export function rotateWaClientIntegrationToken(clientKey: string) {
 export function getWaClientIntegrationToken(clientKey: string) {
   return apiFront
     .get<GetIntegrationTokenResponseHttpDto>(`/api/wa-clients/${clientKey}/integration-token`)
+    .then((response) => response.data);
+}
+
+export function setWaClientIntegrationMode(clientKey: string, dto: SetWaClientIntegrationModeHttpDto) {
+  return apiFront
+    .patch<ClientKeyResponseHttpDto>(`/api/wa-clients/${clientKey}/integration-mode`, dto)
+    .then((response) => response.data);
+}
+
+export function listWaClientWhitelistNumbers(clientKey: string) {
+  return apiFront
+    .get<WaClientWhitelistResponseHttpDto>(`/api/wa-clients/${clientKey}/whitelist-numbers`)
+    .then((response) => response.data);
+}
+
+export function addWaClientWhitelistNumber(clientKey: string, dto: AddWaClientWhitelistNumberHttpDto) {
+  return apiFront
+    .post<StatusOkResponseHttpDto>(`/api/wa-clients/${clientKey}/whitelist-numbers`, dto)
+    .then((response) => response.data);
+}
+
+export function removeWaClientWhitelistNumber(clientKey: string, waChatId: string) {
+  return apiFront
+    .delete<StatusOkResponseHttpDto>(`/api/wa-clients/${clientKey}/whitelist-numbers/${encodeURIComponent(waChatId)}`)
     .then((response) => response.data);
 }

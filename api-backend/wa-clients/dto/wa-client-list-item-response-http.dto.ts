@@ -4,6 +4,8 @@ export interface WaClientListItemResponseHttpDto {
   clientKey: string;
   name: string | null;
   isActive: boolean;
+  isIntegrationTestOnly: boolean;
+  whitelistCount: number;
   syncStatus: WaClientSyncStatus;
   hasIntegrationToken: boolean;
   updatedAt: string;
